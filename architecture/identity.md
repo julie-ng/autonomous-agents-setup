@@ -1,6 +1,6 @@
 # Identity — me vs. the agent
 
-The agent is not me. Separate GitHub account, separate SSH key, separate credentials to everything in the SDLC.
+The agent is not me. Own GitHub account. Own SSH key. Own credentials to everything in the SDLC.
 
 Two things kept apart:
 
@@ -25,22 +25,24 @@ user.signingkey            # agent's public key
 core.sshCommand            # pinned to agent key + IdentitiesOnly=yes
 ```
 
-`IdentitiesOnly=yes` matters — without it SSH offers every key in the agent, including mine.
+> [!IMPORTANT]
+> `IdentitiesOnly=yes` is load-bearing. Without it, SSH offers every key in the agent — including mine.
 
 Net effect: every agent commit is cryptographically distinguishable from mine.
 
 > [!NOTE]
-> Repo-scoped **deploy keys** are the alternative to a bot account for push access — locked to one repo, blockable from `main` via branch protection. A bot account is chosen instead because deploy keys can't sign commits, and attribution is the point.
+> **Deploy keys** are the alternative for push access. Repo-scoped, blockable from `main`. Not chosen — they can't sign commits, and attribution is the point.
 
 ## Scope — GitHub, nothing else
 
-Deliberate: the agent's only outbound write is **pushing to its own branch**.
+The agent's only outbound write is **pushing to its own branch**.
 
-- No deploy credentials, no cloud keys, no package-registry tokens.
-- Everything downstream is triggered by **hooks off GitHub** (CI, deploys, checks) — reacting to the branch, not driven by the agent.
-- Anything the agent needs as *input* is fed to it by the orchestrator.
+- No deploy credentials. No cloud keys. No package-registry tokens.
+- Downstream runs off **GitHub hooks** — CI, deploys, checks. Reacting to the branch, not driven by the agent.
+- Inputs come from the orchestrator.
 
-Rationale: a compromised or hallucinating agent can only produce a branch. A branch is reviewable and revertible. Blast radius stays inside a PR.
+> [!IMPORTANT]
+> Blast radius. A compromised or hallucinating agent can only produce a branch. Branches are reviewable and revertible.
 
 ## LLM auth
 
@@ -50,16 +52,16 @@ Rationale: a compromised or hallucinating agent can only produce a branch. A bra
 | **Mechanism** | ACP | API token |
 | **Binding** | Personal Claude Subscription | API token |
 
-Target is remote agents running off API tokens — own credential, no human account in the loop, swappable model.
+Target: remote agents on API tokens. Own credential. No human account in the loop. Swappable model.
 
 ### Claude – via ACP (today)
 
 goose reaches Claude only via **ACP** (`claude-agent-acp`), driving the Claude Code CLI. Not a native goose provider.
 
-- Credential stays on the host — a sentinel crosses into the sandbox, proxy substitutes outbound. Better than mounting `~/.claude/.credentials.json`.
-- No `session resume` / `session fork` on ACP providers. Collides with sandbox pause/resume — plan around it.
+- Credential stays on the host. A sentinel crosses into the sandbox. Proxy substitutes outbound. Better than mounting `~/.claude/.credentials.json`.
+- No `session resume` / `session fork` on ACP providers. Collides with sandbox pause/resume. Plan around it.
 
-Fine as a bridge: the target is API tokens, where goose's native providers apply and ACP drops out.
+A bridge, not the destination. API tokens use goose's native providers — ACP drops out.
 
 ## Getting the key into the sandbox
 
@@ -82,14 +84,10 @@ Agent forwarding is the better fit for signing. To confirm in a spike.
 
 | Date | Decision |
 |---|---|
-| — | Agent gets its own GitHub account, not just a deploy key — attribution requires it |
-| — | One ED25519 key, registered as both auth and signing key |
-| — | Per-repo git config only; `IdentitiesOnly=yes` so the agent never reaches my keys |
-| — | Agent's only write scope is push-to-own-branch. Downstream via GitHub hooks; inputs via orchestrator |
-| — | Interim LLM auth: piggyback Claude subscription via host proxy (token stays on host). Target: API tokens, model-agnostic |
-| — | Claude reachable in goose only via ACP; acceptable since target is API-token providers. No session resume/fork on ACP |
-| Open | How the signing key reaches the sandbox — agent forwarding vs. credential substitution. Neither verified |
-
-## Misc.
-
-- Anthropic Sanctioned: the CLI authenticates against my subscription normally. Scripting subscription OAuth directly is not.
+| — | Own GitHub account, not just a deploy key. Attribution requires it. |
+| — | One ED25519 key. Registered as both auth and signing key. |
+| — | Per-repo git config only. `IdentitiesOnly=yes`. |
+| — | Write scope is push-to-own-branch. Downstream via hooks, inputs via orchestrator. |
+| — | Interim LLM auth via ACP on my subscription. Target: API tokens, model-agnostic. |
+| — | Claude in goose is ACP-only. No session resume/fork. |
+| Open | How the signing key reaches the sandbox. Neither option verified. |
