@@ -76,3 +76,20 @@ Claude config `~/.claude.json` is intentionally **not mounted** because concurre
 
 - folders need re-trusting every time
 - need in-repo `.mcp.json`
+
+## Decision Log
+
+| Date | Decision |
+|---|---|
+| — | `.claude/settings.json` allow/deny rules are a deterrent, not a boundary. |
+| — | Dev containers (Level 1) = default for real isolation. |
+| — | Full VM reserved for actively-suspect code, not everyday use. |
+| Incident | `~/.claude.json` bind-mounted into a devcontainer. Concurrent write truncated it, blocked new sessions. |
+| Resolved | Never mount `~/.claude.json`. Mount `~/.claude` only, mirror the workspace path. |
+| Found | Docker Sandboxes (`sbx`) — stronger than devcontainers (microVM, isolated daemon). CLI-only, no Zed integration. |
+| Found | `sbx setup ssh` + agent forwarding = sandbox SSH access and commit signing without copying the key. Experimental, not verified. |
+| Found | goose fronts Claude via ACP, reusing my subscription. Gap: no session resume/fork on ACP. |
+| Found | herdr and agent-manager both viable. Neither is `sbx`-aware. agent-manager fits the worktree/review workflow better. |
+| Rejected | Orca as session-manager / `sbx` front-end. Not sandbox-aware, owns its own worktree layer, provides no isolation. |
+| Open | Container Use for true multi-session parallel isolation. |
+| Open | **Next: layered spike.** Layer 1 = goose+ACP+Claude in `sbx`. Layer 2 = agent-manager on top. |
