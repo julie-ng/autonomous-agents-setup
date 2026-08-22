@@ -1,4 +1,4 @@
-# Sandboxes
+# Sandbox - isolate the agent
 
 Without some level of hardware isolation, **_technically_ – the agent can access everything _you_ have access to**, including your `~/.ssh`.   
 
@@ -19,6 +19,10 @@ I've been using [Dev Containers](https://containers.dev/) in my [Zed IDE](https:
 | **Network** | Isolated — own stack inside the VM | Bridged — own namespace, routed via host |
 
 ### Docker Sandbox
+
+I chose [Docker Sandbox](https://docs.docker.com/ai/sandboxes/) because I can leverage my existing experience without dealing with new abstraction layers.
+
+Also the sandbox CLI is free to use, including for commercial work.
 
 ## Install
 
