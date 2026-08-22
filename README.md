@@ -24,7 +24,7 @@ Working notes on running Claude Code agents autonomously with real isolation bou
 
 ## Existing Setup (July 2026)
 
-- Dev containers ([Isolation Rung 1](./architecture/README.md)) in Zed.
+- Dev containers ([Isolation Level 1](./architecture/README.md)) in Zed.
 
 ### Dev Container
 
@@ -37,7 +37,8 @@ Working notes on running Claude Code agents autonomously with real isolation bou
 #### Cons
 
 - Shared host kernel (nice to have)
-- Claude owns/drives subagents (my main concern)
+- Secure, but slow: because I am security conscious, I rarely give Claude broad permissions and have to manually click "Allow once" for _every_ change. 
+- Claude owns/drives subagents
   - No _per-task_ model selection. By default subagents inherit main session's model, e.g. Opus – not cost effective. The `CLAUDE_CODE_SUBAGENT_MODEL` env var is not task configurable.  
   - No visibility into subagents – need to wait until it finishes just to realize it hallucinated and did the wrong thing. I want to be able to live inspect and course-correct.
 
