@@ -2,6 +2,8 @@
 
 The agent is not me. Own GitHub account. Own SSH key. Own credentials to everything in the SDLC.
 
+![Identity Separation](./../images/identity-separation.svg)
+
 Two things kept apart:
 
 - **Authentication** — can it push?
