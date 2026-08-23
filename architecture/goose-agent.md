@@ -1,6 +1,8 @@
 # goose — the agent front-end
 
-[goose](https://block.github.io/goose/) (Block, open source) is the agent runtime inside the sandbox. Claude Code is the model behind it, reached over ACP.
+[goose](https://block.github.io/goose/) is the agent runtime inside the sandbox. Claude Code is the model behind it, reached over ACP.
+
+![Goose in Agent Stack](./../images/agent-stack-goose.svg)
 
 Why goose rather than Claude Code directly:
 
@@ -8,8 +10,11 @@ Why goose rather than Claude Code directly:
 - Prepackages plugins, skills, extensions per agent.
 - Runs headless outside an IDE — the point of the whole setup.
 
-## The chain
+> [!IMPORTANT]
+> I chose goose because it's an [Agentic AI Foundation (AAIF)](https://aaif.io/projects/goose) project — foundation-governed with same reasoning as picking CNCF over proprietary tools: no vendor lock-in.
 
+## The chain
+ 
 ```
 goose (client) → ACP → claude-agent-acp → Claude Code
 ```
@@ -43,13 +48,13 @@ Candidates for what breaks in a sandbox but not on host:
 
 Collides directly with `sbx` pause/resume. Pause a sandbox mid-session and the goose session is likely gone. Plan around it — not a bug to chase.
 
-**Credentials don't cross automatically.** A sandbox won't inherit host `~/.claude` auth unless deliberately wired. Expect a fresh login per sandbox otherwise. Decide this deliberately rather than being surprised by it.
+## Authentication
 
-## Where this sits
+- Using Claude Code for now – to test and build out system system
+- Will be **model agnostic** in future – targeting cheaper and specialized models, e.g. [Codex](https://openai.com/codex/).
 
-Layer 1 of the two-layer spike. [agent-manager](./session-management.md) wiring is Layer 2, and doesn't start until this is boring and reliable.
-
-Layer 1 is independently valuable. If Layer 2 fails, Layer 1 still counts as settled.
+> [!IMPORTANT]
+> **Do not mount `~/.claude`.** Per anthropic usage policy, if running locally, authN must be via ACP and then `/login` slash command _within_ ACP session. Otherwise use API token.
 
 ## Decision log
 
@@ -61,3 +66,9 @@ Layer 1 is independently valuable. If Layer 2 fails, Layer 1 still counts as set
 | — | No session resume/fork on ACP. Plan around `sbx` pause/resume. |
 | Open | Does the chain work **inside** `sbx`? Layer 1 spike, not yet run. |
 | Open | Per-sandbox login, or wire credentials deliberately? |
+
+## Misc.
+
+### Alternatives
+
+- [LangChain "Deep Agents"](https://docs.langchain.com/oss/javascript/deepagents/overview) - is more of a harness library, requiring more plumbing.
