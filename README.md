@@ -81,6 +81,28 @@ Claude config `~/.claude.json` is intentionally **not mounted** because concurre
 - folders need re-trusting every time
 - need in-repo `.mcp.json`
 
+## Current Progress
+
+Loose wording now to capture what's needed.
+
+### Agent Setup
+
+- [X] Installed official Docker sandbox image for claude-code with `/login` to my subscription
+- [X] Install and test goose
+- [X] Connect my Claude subscription via ACP
+- [ ] Run goose from Docker Sandbox
+
+### Orchestration
+
+- [ ] Connect sandboxed goose with `agent-manager`
+- [ ] Connect agent-manager and Zed/claude-code as orchestrator to assign geese.
+
+### Customization
+
+- [ ] Package custom skills, MCP servers, plugins with goose agent.
+- [ ] Deploy custom goose-agent as Docker image
+- [ ] Integrate custom goose-agent with Docker Sandbox
+
 ## Decision Log
 
 | Date | Decision |
