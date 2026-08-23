@@ -1,15 +1,16 @@
 # Sandbox - isolate the agent
 
-Without some level of hardware isolation, **_technically_ – the agent can access everything _you_ have access to**, including your `~/.ssh`.   
+Without some level of hardware isolation… _technically_ your coding agent can access everything _you_ have access to:
+
+![Sandbox isolation](../images/sandbox-isolation.svg) 
 
 What's stopping it? Not much, even though providers include protections against prompt injections. **Claude-Code already hallucinated `../../` once for me.**
- I want solid isolation boundaries, not "Don't do that" instructions.
 
-Configuration != Security.
+After that incident, I setup [Dev Containers](https://containers.dev/) in my [Zed IDE](https://zed.dev/docs/editor/dev-containers).
 
 ### MicroVMs vs Sandboxes
 
-I've been using [Dev Containers](https://containers.dev/) in my [Zed IDE](https://zed.dev/docs/editor/dev-containers). But I need something for running autonmous agents _external_ to my IDE.
+ Now I want something for running autonmous agents _external_ to my IDE and managed by _me_, not my main claude session.
 
 | | MicroVM | Dev Container |
 |---|---|---|
