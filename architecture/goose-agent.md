@@ -23,14 +23,8 @@ goose (client) → ACP → claude-agent-acp → Claude Code
 
 ACP providers are goose's **recommended replacement for the deprecated CLI providers**. They reuse an existing Claude Code login rather than a separate API key.
 
-See [identity.md](./identity.md) for auth and credential handling.
-
-## Status
-
-| | |
-|---|---|
-| **On host** | Verified. goose loads Claude Code via ACP against my subscription. |
-| **In `sbx`** | **Not verified.** Spike pending. |
+> [!Tip]
+> See [identity.md](./identity.md) for auth and credential handling.
 
 Nothing in the chain is sandbox-specific — it's a process chain that should run inside `sbx` like any other. Should isn't verified.
 
@@ -53,19 +47,22 @@ Collides directly with `sbx` pause/resume. Pause a sandbox mid-session and the g
 - Using Claude Code for now – to test and build out system system
 - Will be **model agnostic** in future – targeting cheaper and specialized models, e.g. [Codex](https://openai.com/codex/).
 
-> [!IMPORTANT]
+> [!Warning]
 > **Do not mount `~/.claude`.** Per anthropic usage policy, if running locally, authN must be via ACP and then `/login` slash command _within_ ACP session. Otherwise use API token.
 
 ## Decision log
 
-| Date | Decision |
+| Decision | Notes |
 |---|---|
-| — | goose is the agent front-end. Model-agnostic, headless, prepackages skills. |
-| — | Claude reached via ACP (`claude-agent-acp`), not a native goose provider. |
-| Verified | goose + ACP + Claude Code works on host against my subscription. |
-| — | No session resume/fork on ACP. Plan around `sbx` pause/resume. |
-| Open | Does the chain work **inside** `sbx`? Layer 1 spike, not yet run. |
-| Open | Per-sandbox login, or wire credentials deliberately? |
+| Harness | Goose: model-agnostic, headless, prepackages skills. |
+| AuthN (local dev) | Claude reached via ACP (`claude-agent-acp`) |
+| AuthN (remote agent) | API tokens (vendor agnostic) |
+
+### Accepted Trade-Offs
+
+| Tradeoff | Notes |
+|---|---|
+| No session resume/fork on ACP | **Doesn't really matter.** ACP is local dev only. Prod version would use API tokens anyway. |
 
 ## Misc.
 
