@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 260" width="420" height="260" font-family="ui-sans-serif, system-ui, -apple-system, sans-serif">
+
+  <!-- Docker Sandbox — solid boundary -->
+  <rect x="20" y="20" width="380" height="220" rx="8"
+        fill="none" stroke="#6b7280" stroke-width="2.5"/>
+  <text x="40" y="48" font-size="15" font-weight="600" fill="#6b7280">🐳 Docker Sandbox</text>
+  <text x="40" y="66" font-size="11" fill="#9ca3af">microVM — hypervisor boundary</text>
+
+  <!-- goose — not a boundary -->
+  <rect x="50" y="84" width="320" height="132" rx="6"
+        fill="none" stroke="#9ca3af" stroke-width="1.5" stroke-dasharray="5 4"/>
+  <text x="70" y="110" font-size="14" font-weight="600" fill="#9ca3af">🪿 goose</text>
+  <text x="70" y="128" font-size="11" fill="#9ca3af">open-source agent runtime</text>
+
+  <!-- LLM — not a boundary -->
+  <rect x="80" y="142" width="260" height="58" rx="6"
+        fill="none" stroke="#9ca3af" stroke-width="1.5" stroke-dasharray="5 4"/>
+  <text x="100" y="166" font-size="14" font-weight="600" fill="#9ca3af">🧠 LLM</text>
+  <text x="100" y="184" font-size="11" fill="#9ca3af">model-agnostic</text>
+
+</svg>

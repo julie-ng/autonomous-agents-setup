@@ -2,6 +2,10 @@
 
 Working notes on running Claude Code agents autonomously with real isolation boundaries — sandboxes, git identity separation, and session management. 
 
+#### Agent Stack
+
+![Agent Stack](./images/agent-stack.svg)
+
 ## Design Goals
 
 ### Security
