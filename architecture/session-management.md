@@ -73,13 +73,16 @@ Category error, not a gap. Nice UI, wrong layer.
 
 ## Decision log
 
-| Date | Decision |
+| Decision | Notes |
 |---|---|
-| — | Need a path into a stuck agent that doesn't depend on it reaching GitHub. |
-| — | Multiple terminals in one container are peers. Not mutually isolated. |
-| — | agent-manager is the frontrunner over herdr. Worktree + diff review fit the workflow. |
-| — | Neither tool is `sbx`-aware. Session manager is UI only, never the boundary. |
+| Session manager | agent-manager over herdr. Worktree spawn + in-terminal diff review fit the workflow. |
+| Layer | UI only, never the boundary. `sbx` is the boundary. |
 | Rejected | Orca. Owns its own worktree layer, no sandbox model, no isolation of its own. |
-| Open | Container Use for parallel isolated sessions. Not prototyped. |
-| Open | Wiring agent-manager to `sbx`, likely via `sbx exec`/`ssh`. Not attempted. |
-| Open | Does hook-based status survive the ACP bridge? Unverified. |
+
+### Accepted Trade-Offs
+
+| Tradeoff | Notes |
+|---|---|
+| No tool is `sbx`-aware | Wire it by pointing a pane at `sbx exec`/`ssh` rather than a bare process. |
+| Hook-based status may degrade | agent-manager reads Claude Code hooks. Behind ACP it may fall back to screen-inference — looks like it works, but is guessing. |
+| Parallel sessions need one sandbox each | Terminals in one container are peers, not mutually isolated. |

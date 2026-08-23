@@ -82,12 +82,18 @@ Agent forwarding is the better fit for signing. To confirm in a spike.
 
 ## Decision log
 
-| Date | Decision |
+| Decision | Notes |
 |---|---|
-| — | Own GitHub account, not just a deploy key. Attribution requires it. |
-| — | One ED25519 key. Registered as both auth and signing key. |
-| — | Per-repo git config only. `IdentitiesOnly=yes`. |
-| — | Write scope is push-to-own-branch. Downstream via hooks, inputs via orchestrator. |
-| — | Interim LLM auth via ACP on my subscription. Target: API tokens, model-agnostic. |
-| — | Claude in goose is ACP-only. No session resume/fork. |
-| Open | How the signing key reaches the sandbox. Neither option verified. |
+| GitHub identity | Own account, not just a deploy key. Deploy keys can't sign. |
+| Key | One ED25519, registered as both auth and signing key. |
+| Git config | Per-repo only. `IdentitiesOnly=yes`. |
+| Write scope | Push to own branch. Downstream via hooks, inputs via orchestrator. |
+| AuthN (local dev) | ACP on my Claude subscription. |
+| AuthN (remote agent) | API tokens, vendor-agnostic. |
+
+### Accepted Trade-Offs
+
+| Tradeoff | Notes |
+|---|---|
+| Agent borrows my LLM identity | Local dev only. Own GitHub identity is unaffected. Remote agents get their own API token. |
+| Re-trusting per sandbox | Credentials don't cross the boundary automatically. Cost of not mounting `~/.claude`. |

@@ -95,6 +95,9 @@ Loose wording now to capture what's needed.
 ### Orchestration
 
 - [ ] Connect sandboxed goose with `agent-manager`
+  - [ ] Wire it to the sandbox — point a pane at `sbx exec`/`ssh`, not a bare process
+  - [ ] Does hook-based status survive the ACP bridge, or silently degrade to screen-inference?
+  - [ ] Worktree collision — agent-manager spawns worktrees, so does `sbx`
 - [ ] Connect agent-manager and Zed/claude-code as orchestrator to assign geese.
 
 ### Customization
