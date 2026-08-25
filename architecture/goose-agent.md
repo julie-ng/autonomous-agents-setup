@@ -42,6 +42,22 @@ Candidates for what breaks in a sandbox but not on host:
 
 Collides directly with `sbx` pause/resume. Pause a sandbox mid-session and the goose session is likely gone. Plan around it — not a bug to chase.
 
+## Install
+
+Install Desktop App
+
+```sh
+brew install --cask block-goose
+```
+
+Install CLI
+
+```sh
+brew install block-goose-cli
+```
+
+[See full instructions &rarr;](https://goose-docs.ai/docs/getting-started/installation)
+
 ## Authentication
 
 - Using Claude Code for now – to test and build out system system
