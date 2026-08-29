@@ -73,6 +73,21 @@ sbx policy rm network <host>
 ```
 </details>
 
+### Verify the boundary
+
+Don't trust the mount point looks — check it. `ls ..` from inside the sandbox returns real-looking contents, but that's not evidence of a leak by itself.
+
+```sh
+mount | grep -v overlay   # what's actually a real mount, vs. container overlayfs
+whoami; hostname          # confirm you're not on the host
+ls ../..                  # apparent parent dirs — are they real, or synthetic?
+```
+
+**Confirmed:** only the workspace path itself (e.g. `/Users/julieng/Workspace/julie-ng/<repo>`) is a real `virtiofs` mount back to the host. Everything above it in the tree is `overlayfs` built from container image layers — a synthetic directory structure that happens to mirror the host path down to the leaf, not the host filesystem itself. `whoami`/`hostname` confirm a different user/host entirely (`agent@shell-<sandbox-name>`).
+
+Also confirmed: no access to host home-directory contents outside the mount — e.g. Claude's own memory files under `~/.claude/` on the host are not reachable from inside the sandbox.
+
+This is what makes it Layer 1 (isolation), not Layer 2 (convenience) — a hypervisor/mount-level boundary, not a config rule.
 
 # Misc.
 
