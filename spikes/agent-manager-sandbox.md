@@ -2,14 +2,14 @@
 
 **Question:** can agent-manager monitor and drive a goose session running inside `sbx` without degrading or colliding?
 
-Status: blocked on [goose-in-sandbox](./goose-in-sandbox.md)
+Status: unblocked — [goose-in-sandbox](./goose-in-sandbox.md) is a confirmed Go. Not started yet.
 
 > [!NOTE]
 > Convenience layer only. `sbx` remains the boundary. Nothing here adds isolation.
 
 ## Prerequisites
 
-- [ ] goose-in-sandbox spike is a **go**
+- [X] goose-in-sandbox spike is a **go**
 - [ ] agent-manager installed on host
 
 ## Steps

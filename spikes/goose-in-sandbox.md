@@ -2,7 +2,7 @@
 
 **Question:** does goose → ACP → Claude Code behave the same inside `sbx` as it does on host?
 
-Status: **No-go** — ACP handshake fails in the sandbox specifically, per below.
+Status: **Go** — works, once a `sbx`-injected env var is unset. Root cause confirmed, see below.
 
 ## What's under test
 
@@ -39,11 +39,17 @@ curl -fsSL https://github.com/aaif-goose/goose/releases/download/stable/download
 ```sh
 npm install -g @agentclientprotocol/claude-agent-acp
 ```
-- [ ] **Auth:** fresh `/login` prompt inside the sandbox, or does it find something? Expect fresh. `~/.claude` is not mounted. — **Failed.** `goose session` → any message, including `/login`, fails instantly (~0.2–0.3s) with `Invalid API key: authentication_failed`. Confirmed this isn't missing OAuth: a direct `claude` CLI login (outside goose) inside the same sandbox succeeds fine and produces a resumable session — `goose`'s ACP connection isn't using those credentials at all. Also confirmed not a network-policy block: `api.anthropic.com` traffic is allowed and succeeding per `sbx policy log`. Root cause not fully confirmed — live suspect is an `sbx`-injected `ANTHROPIC_API_KEY` env var (`proxy-managed`) that `goose`'s spawned ACP subprocess may inherit and fail on before ever reaching OAuth. See `SPIKE.md` (uncommitted, repo root) for full diagnostic detail if still present.
-- [ ] `goose session` — not `goose term`. `term` is shell integration (`@goose`/`@g` aliases in your existing shell); `session` is the actual agent interface and the one that goes through ACP to Claude Code.
-- [ ] Trivial session against the test repo — "summarize the README"
-- [ ] Response comes back **through goose**, not just the adapter process running
-- [ ] A tool call — "add a comment to the top of file X". Confirms tool-bridging, not just chat.
+- [X] **Auth:** fresh `/login` prompt inside the sandbox, or does it find something? Expect fresh. `~/.claude` is not mounted. — **Root cause confirmed.** `sbx` injects placeholder env vars for well-known credential names into every sandbox — `ANTHROPIC_API_KEY="proxy-managed"`, `GH_TOKEN="gho_sbxproxymanaged..."`, `GOOGLE_API_KEY="proxy-managed"`. These are literal sentinel strings, not real keys — likely meant for tools that only check "is this set." The Claude Agent SDK (bundled inside `claude-agent-acp`, separate binary from the standalone `claude` CLI) takes the literal string at face value and sends it as the API key, which Anthropic rejects instantly as `Invalid API key: authentication_failed` — before ever falling back to the real OAuth token in `~/.claude/.credentials.json` (written by a direct `claude` CLI `/login`, done once per sandbox). Fix, needed once per fresh sandbox shell:
+
+  ```sh
+  unset ANTHROPIC_API_KEY
+  ```
+
+  Confirmed via clean before/after test: identical session, only that env var changed, behavior flipped from consistent failure to working. Not a network, subprocess-spawn, `$HOME`, or version issue — all of those were checked directly and ruled out first.
+- [X] `goose session` — not `goose term`. `term` is shell integration (`@goose`/`@g` aliases in your existing shell); `session` is the actual agent interface and the one that goes through ACP to Claude Code.
+- [X] Trivial session against the test repo — sent a plain chat message, got a real response back once the env var was unset.
+- [X] Response comes back **through goose**, not just the adapter process running — confirmed, same test.
+- [X] A tool call — asked it to create a file with specific contents; file appeared with the right contents. Confirms tool-bridging through ACP, not just chat.
 
 ## Go / no-go
 
@@ -60,4 +66,4 @@ Other suspects, in order: missing dependency in the template, subprocess-spawn r
 
 | Date | Result | Notes |
 |---|---|---|
-| 2026-08-29 | **No-go** | ACP auth fails in sandbox only. Root cause unconfirmed — suspect `sbx`'s injected `ANTHROPIC_API_KEY` env var pre-empting the OAuth flow. Not root-caused before session ended; handed off to Claude Desktop via `SPIKE.md` (uncommitted). |
+| 2026-08-29 | **Go** | Root cause: `sbx` injects a placeholder `ANTHROPIC_API_KEY="proxy-managed"` env var into every sandbox, which the ACP adapter's bundled SDK sends as a literal (invalid) API key instead of falling back to the real OAuth token. Fix: `unset ANTHROPIC_API_KEY` before running `goose`, once per fresh sandbox shell. Confirmed end-to-end: chat response and a real tool call (file creation) both work through ACP once unset. |
