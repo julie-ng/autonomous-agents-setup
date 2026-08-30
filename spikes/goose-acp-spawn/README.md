@@ -44,4 +44,4 @@ The client stubs the filesystem — `readTextFile` returns `"Mock file content"`
 
 Phase 1 uses `goose run --text "$PROMPT"` — fire-and-die, no ACP client needed. This spike proves ACP is available for when a controller needs streaming progress, permission prompts, or mid-task intervention.
 
-See [orhcestration-k8s-phase-1.md](../../architecture/orhcestration-k8s-phase-1.md).
+See [orchestration-k8s-phase-1.md](../../spikes/orchestration-k8s-phase-1.md).
