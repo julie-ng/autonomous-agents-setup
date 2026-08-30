@@ -1,13 +1,15 @@
-### Phase 2 Design Summary: Event-Driven GitHub Orchestration with Argo Events
+# Phase 2: Event-Driven GitHub Orchestration
 
-**Objective:** Automate task execution by triggering Phase 1 Kubernetes `Jobs` dynamically whenever a GitHub Issue or Pull Request comment is created. This replaces manual `kubectl apply` commands with declarative, open-source event routing.
+**Objective:** Trigger the Phase 1 `Job` from a GitHub webhook instead of `kubectl apply`. Same execution unit, automated dispatch.
+
+**Prerequisite:** [Phase 1](./orchestration-k8s-phase-1.md) is a go.
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────────┐
 │ GITHUB                                                                          │
 │  ┌────────────────────────┐                                                     │
 │  │ Issue / Comment Event  │                                                     │
-│  │ (e.g., "Fix bug in x") │                                                     │
+│  │ (e.g., "/goose fix x") │                                                     │
 │  └───────────┬────────────┘                                                     │
 └──────────────┼──────────────────────────────────────────────────────────────────┘
                │ Webhook HTTPS Payload
@@ -15,10 +17,10 @@
 ┌─────────────────────────────────────────────────────────────────────────────────┐
 │ KUBERNETES CLUSTER (Argo Events Namespace)                                      │
 │                                                                                 │
-│  ┌────────────────────────┐  Triggers Event   ┌──────────────────────────────┐ │
-│  │ EventSource            │──────────────────►│ Sensor                       │ │
-│  │ (Webhook Listener)     │                   │ (JSON Path Parameterizer)    │ │
-│  └────────────────────────┘                   └──────────────┬───────────────┘ │
+│  ┌────────────────────────┐  Triggers Event   ┌──────────────────────────────┐  │
+│  │ EventSource            │──────────────────►│ Sensor                       │  │
+│  │ (Webhook Listener)     │                   │ (JSON Path Parameterizer)    │  │
+│  └────────────────────────┘                   └──────────────┬───────────────┘  │
 └──────────────────────────────────────────────────────────────┼──────────────────┘
                                                                │ Instantiates
                                                                ▼
@@ -26,34 +28,49 @@
 │ KUBERNETES CLUSTER (Default Namespace)                                          │
 │                                                                                 │
 │  ┌───────────────────────────────────────────────────────────────────────────┐  │
-│  │ Triggered Kubernetes Job                                                  │  │
+│  │ Triggered Kubernetes Job — same shape as Phase 1                          │  │
 │  │                                                                           │  │
 │  │  ┌────────────────────────┐         ┌──────────────────────────────────┐  │  │
-│  │  │ Init Container         │         │ Main Container                   │  │  │
-│  │  │ (git-clone)            │ Volume  │ (goose-agent)                    │  │  │
-│  │  │                        │ Mount   │                                  │  │  │
-│  │  │ • Clones target repo   │────────►│ • Target repo mounted            │  │  │
-│  │  │   from webhook event   │         │ • $TASK_PROMPT set dynamically    │  │  │
-│  │  │ • Checks out branch    │         │   from issue body                │  │  │
+│  │  │ Init Container         │ Volume  │ Main Container                   │  │  │
+│  │  │ (git-clone via SSH)    │ Mount   │ (goose-agent)                    │  │  │
+│  │  │                        │────────►│                                  │  │  │
+│  │  │ • Repo from payload    │         │ • $TASK_PROMPT from issue body   │  │  │
+│  │  │ • Agent identity       │         │ • Commits, pushes, opens PR      │  │  │
 │  │  └────────────────────────┘         └──────────────────────────────────┘  │  │
 │  └───────────────────────────────────────────────────────────────────────────┘  │
 └─────────────────────────────────────────────────────────────────────────────────┘
-
 ```
 
 ---
 
-### Phase 2 Architecture & Component Breakdown
+## Components
 
-1. **Argo Events `EventSource`:** Operates a lightweight, secure HTTP endpoint in your cluster. It captures incoming GitHub webhook POST requests and validates the HMAC signature using a shared secret.
-2. **Argo Events `Sensor`:** Intercepts the validated webhook event, extracts key fields (Issue title, Issue body, Repository URL, Branch/Ref), injects them as environment variables into a Kubernetes `Job` template, and submits the job.
-3. **Execution Unit:** Reuses the exact same single-container **Goose** setup validated in Phase 1.
+1. **`EventSource`** — HTTP endpoint in-cluster. Captures GitHub webhook POSTs, validates HMAC signature against a shared secret.
+2. **`Sensor`** — extracts fields from the payload (issue title/body, repo, ref), injects them into a `Job` template, submits it.
+3. **Execution unit** — unchanged from Phase 1. Same image, same identity, same security context.
 
 ---
 
-### Phase 2 Manifests
+## What carries over from Phase 1
 
-#### 1. Setup Secrets and EventSource (`eventsource.yaml`)
+Everything about the Job itself. Only the *trigger* changes.
+
+- SSH auth and signing via `agent-ssh-key` Secret, `defaultMode: 0400`
+- `securityContext` — non-root, uid 1000, `fsGroup` for the shared volume
+- Vercel AI Gateway provider config, overridable via env
+- Agent identity: `julieio-goose`
+
+> [!IMPORTANT]
+> **Push + PR mechanism is confirmed in Phase 1, not here.** Phase 1 stops at a pushed branch; `gh` CLI and PR creation are still open there. Don't design the PR step in this doc until Phase 1 settles how it works.
+
+---
+
+## Manifests
+
+> [!NOTE]
+> Sketch only. Full manifest lands once Phase 1 is proven — the Job spec below is intentionally abbreviated to avoid duplicating what Phase 1 owns.
+
+### 1. EventSource (`eventsource.yaml`)
 
 ```yaml
 apiVersion: v1
@@ -63,7 +80,7 @@ metadata:
   namespace: argo-events
 type: Opaque
 stringData:
-  secret: "your-shared-github-webhook-secret" # Must match Secret set in GitHub Webhook settings
+  secret: "<shared-secret>"   # must match GitHub webhook settings
 ---
 apiVersion: argoproj.io/v1alpha1
 kind: EventSource
@@ -87,12 +104,11 @@ spec:
       webhookSecret:
         name: github-webhook-secret
         key: secret
-
 ```
 
-#### 2. Event Sensor Trigger (`sensor.yaml`)
+### 2. Sensor (`sensor.yaml`)
 
-This sensor captures the payload from `github-events`, extracts the repository URL and Issue description, and injects them into the Phase 1 Job.
+Captures the payload, parameterizes the Phase 1 Job.
 
 ```yaml
 apiVersion: argoproj.io/v1alpha1
@@ -112,6 +128,8 @@ spec:
           operation: create
           source:
             resource:
+              # Phase 1 Job spec, verbatim — see orchestration-k8s-phase-1.md
+              # Only TASK_PROMPT and the repo URL are parameterized.
               apiVersion: batch/v1
               kind: Job
               metadata:
@@ -120,93 +138,50 @@ spec:
               spec:
                 ttlSecondsAfterFinished: 600
                 backoffLimit: 0
-                template:
-                  spec:
-                    restartPolicy: Never
-                    volumes:
-                      - name: workspace-volume
-                        emptyDir: {}
+                # ... securityContext, volumes, initContainers, containers
+                #     identical to Phase 1
 
-                    initContainers:
-                      - name: git-clone
-                        image: alpine/git:latest
-                        volumeMounts:
-                          - name: workspace-volume
-                            mountPath: /workspace
-                        workingDir: /workspace
-                        env:
-                          - name: GITHUB_TOKEN
-                            valueFrom:
-                              secretKeyRef:
-                                name: github-credentials
-                                key: token
-                          - name: REPO_URL
-                            value: "placeholder" # Parameterized below
-                        command: ["/bin/sh", "-c"]
-                        args:
-                          - |
-                            git clone https://x-access-token:${GITHUB_TOKEN}@${REPO_URL}.git .
-                            git config user.name "Goose Agent"
-                            git config user.email "agent@goose.local"
-                            git checkout -b feature/agent-automated-fix
-
-                    containers:
-                      - name: goose-agent
-                        image: your-org/goose-cli:latest
-                        workingDir: /workspace
-                        volumeMounts:
-                          - name: workspace-volume
-                            mountPath: /workspace
-                        env:
-                          - name: OPENROUTER_API_KEY
-                            valueFrom:
-                              secretKeyRef:
-                                name: model-credentials
-                                key: api-key
-                          - name: GOOSE_PROVIDER
-                            value: "openrouter"
-                          - name: GOOSE_MODEL
-                            value: "deepseek/deepseek-r1"
-                          - name: TASK_PROMPT
-                            value: "placeholder" # Parameterized below
-                        command: ["goose"]
-                        args:
-                          - "run"
-                          - "--text"
-                          - "$(TASK_PROMPT)"
-
-          # Parameter Mapping from GitHub Webhook Payload -> Kubernetes Job Spec
           parameters:
-            # 1. Inject Issue Body/Title as the TASK_PROMPT
+            # Issue title + body → TASK_PROMPT
             - src:
                 dependencyName: github-dep
                 dataTemplate: "Title: {{ .Input.body.issue.title }}\n\nDetails: {{ .Input.body.issue.body }}"
               dest: spec.template.spec.containers.0.env.3.value
 
-            # 2. Extract Repo HTML URL (strips https:// prefix for git clone sub-stringing)
+            # Repo → clone URL
             - src:
                 dependencyName: github-dep
                 dataKey: body.repository.full_name
-              dest: spec.template.spec.initContainers.0.env.1.value
-              valueFormat: "github.com/%s"
-
+              dest: spec.template.spec.initContainers.0.env.0.value
+              valueFormat: "git@github.com:%s.git"
 ```
 
 ---
 
-### Phase 2 Deployment Steps
+## Deployment
 
-1. **Install Argo Events on Cluster:**
+1. **Install Argo Events**
+
 ```bash
 kubectl create namespace argo-events
 kubectl apply -f https://raw.githubusercontent.com/argoproj/argo-events/stable/manifests/install.yaml
-
 ```
 
+2. **Expose the endpoint** — Ingress, or `ngrok` / `kubectl port-forward` to `github-events-eventsource-svc:12000`.
 
-2. **Expose `EventSource` Endpoint:**
-Create an Ingress resource or execute a local tunnel (e.g., `ngrok` or `kubectl port-forward`) pointing to `github-events-eventsource-svc:12000`.
-3. **Configure GitHub Webhook:**
-In your GitHub repository, point Webhooks to your exposed Ingress URL, set Content-Type to `application/json`, select the **Issues** and **Issue Comments** events, and input your shared secret.
-4. **End-to-End Test:**
-Open a new Issue in your GitHub repository titled *"Refactor logger to include ISO timestamps"*. Observe Argo Events triggering a new `goose-agent-job-*` pod that runs Goose against the prompt automatically.
+3. **Configure the GitHub webhook** — point at the exposed URL, content-type `application/json`, subscribe to Issues + Issue Comments, set the shared secret.
+
+4. **End-to-end test** — open an issue, watch a `goose-agent-job-*` pod appear and run.
+
+---
+
+## Deferred
+
+Known and solvable. Not the focus while proving the mechanism. See [gotchas](./orchestration-k8s-gotchas.md).
+
+- **Trigger filtering.** Currently fires on every `issues` / `issue_comment` event, including the agent's own comments — an infinite loop. Needs an explicit opt-in (magic comment or label).
+- **Branch collisions.** Hardcoded branch name breaks on concurrent runs. Parameterize.
+- **Prompt injection.** Issue text goes straight into the prompt, in a pod holding an SSH key.
+- **Runaway cost.** No `activeDeadlineSeconds`, no resource limits.
+- **Silent failure.** Async job, nothing posts back to GitHub.
+- **Index-based parameter mapping.** `env.3.value` breaks silently if the env list is reordered.
