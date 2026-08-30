@@ -1,127 +1,113 @@
 # 🪿 autonomous-agents-setup
 
-Working notes on running Claude Code agents autonomously with real isolation boundaries — sandboxes, git identity separation, and session management. 
+Working notes on running coding agents autonomously — real isolation boundaries, their own git identity, orchestrated outside the IDE.
 
-#### Agent Stack
+## AI-Native SDLC
 
-![Agent Stack](./images/agent-stack.svg)
+```
+   👤 me — human architect                 🪿 geese — autonomous agents
+   ─────────────────────────                ────────────────────────────
+   interactive, in the loop                 headless, nobody watching
+
+┌──────────────────────────┐             ┌──────────────────────────────┐
+│ 💻 Host (my machine)     │             │ ☸️  Kubernetes                │
+│                          │             │                              │
+│  ┌────────────────────┐  │             │  ┌────────────────────────┐  │
+│  │ 🐳 Dev Container   │  │             │  │ 🐳 Job (one per task)  │  │
+│  │                    │  │             │  │                        │  │
+│  │  Zed + Claude      │  │             │  │  🪿 goose              │  │
+│  │  pair on design    │  │             │  │  runs the task         │  │
+│  └────────────────────┘  │             │  └────────────────────────┘  │
+└──────────────────────────┘             └──────────────────────────────┘
+             │                                          │
+             │  defines the work                        │  git push
+             ▼                                          ▼
+      ┌──────────────────────────────────────────────────────┐
+      │ 🐙 GitHub — issues in, branches out                  │
+      └──────────────────────────────────────────────────────┘
+```
+
+- **Me — the human architect.** Interactive session in a [dev container](./architecture/dev-container.md), paired with the LLM on my host. I define the work and review what comes back.
+- **The geese — autonomous agents.** Pick up work I've already defined, run headless in a pod, push a branch. Nobody watching.
+
+The point is not to babysit sessions. No approving every change, no manually pushing to GitHub.
 
 ## Design Goals
 
 ### Security
 
-- Hardware-level isolation — hypervisor boundary, not config rules.
+- Isolation is a boundary, not config rules.
 - Agent has own identity
   - separate cryptographically signed commits
-  - can piggy-back on auth to LLM subscriptions, e.g. Claude
-  - but has own credentials to SDLC services, e.g. git, deployments, etc.
+  - own credentials to SDLC services, e.g. git, deployments, etc.
+  - only write scope is pushing its own branch
 
 ### Orchestration
 
+- Runs headless. GitHub issue in, PR out.
 - Visibility into a stuck or crashed agent that doesn't depend on it reaching GitHub.
 
-### Sub-agents (fit-for-purpose)
+### Agents (fit-for-purpose)
 
 - Run _autonomously_ outside the IDE, in parallel, without them colliding.
 - Task specific agents, e.g. `frontend-dev` vs `backend-dev`, vs `qa-checker`
 - Size-for-purpose, e.g. use cheaper models, which work fine in decomposed tasks.
+- **One task, one goose, one pod.** No nesting — a goose spawning its own subagents means no per-task model control and no visibility, which is what I'm moving away from.
 
-## Existing Setup (July 2026)
+## Architecture
 
-- Dev containers ([Isolation Level 1](./architecture/README.md)) in Zed.
+| | |
+|---|---|
+| [Isolation levels](./architecture/README.md) | What counts as a boundary, what's only a deterrent |
+| [Dev container](./architecture/dev-container.md) | My interactive session. Current setup. |
+| [goose](./architecture/goose-agent.md) | The agent runtime. ACP built in, model-agnostic. |
+| [Identity](./architecture/identity.md) | Agent vs. me. Own GitHub account, own SSH key. |
+| [Orchestration](./architecture/orchestration.md) | GitHub → K8s Job → branch → PR |
 
-### Dev Container
-
-#### Pros
-
-- Agent cannot `cd ./..` into parent folder
-- Memory is still persisted across sessions
-- My personal credential files e.g. `~/.ssh`, `~/.aws/credentials` are not accessible.
-
-#### Cons
-
-- Shared host kernel (nice to have)
-- Secure, but slow: because I am security conscious, I rarely give Claude broad permissions and have to manually click "Allow once" for _every_ change. 
-- Claude owns/drives subagents
-  - No _per-task_ model selection. By default subagents inherit main session's model, e.g. Opus – not cost effective. The `CLAUDE_CODE_SUBAGENT_MODEL` env var is not task configurable.  
-  - No visibility into subagents – need to wait until it finishes just to realize it hallucinated and did the wrong thing. I want to be able to live inspect and course-correct.
-
-#### Setup
-
-To persist Claude's memory over multiple session via mounts:
-
-- **Persisted Memory** — `~/.claude`, keyed by workspace path slug, e.g. 
-- **Workspace Folder** — Yes, mirroring the exact host path so the slug matches.
-
-The host path `/Users/jng/workspace/julie-ng/tally-split-ai` is hard-coded into the config:
-
-```json
-/* Example .devcontainer.json */
-{
-  "name": "Claude Node Sandbox",
-  "image": "mcr.microsoft.com/devcontainers/javascript-node:22",
-  "workspaceMount": "source=${localWorkspaceFolder},target=/Users/jng/workspace/julie-ng/tally-split-ai,type=bind,consistency=cached",
-  "workspaceFolder": "/Users/jng/workspace/julie-ng/tally-split-ai",
-  "mounts": [
-    "source=${localEnv:HOME}/.claude,target=/home/node/.claude,type=bind",
-    "target=${containerWorkspaceFolder}/node_modules,type=volume"
-  ],
-  "onCreateCommand": "sudo chown -R node:node ${containerWorkspaceFolder}/node_modules",
-  "postCreateCommand": "npm install && npm install -g @anthropic-ai/claude-code",
-  "customizations": {
-    "zed": {
-      "extensions": ["eslint", "html", "sql", "vue", "mcp-server-context7"]
-    }
-  }
-}
-```
-
-Claude config `~/.claude.json` is intentionally **not mounted** because concurrent writes corrupts the file. Trade-offs:
-
-- folders need re-trusting every time
-- need in-repo `.mcp.json`
+Spikes and working code: [`spikes/`](./spikes/). Retired directions: [`stale/`](./stale/).
 
 ## Current Progress
 
-Loose wording now to capture what's needed.
-
 ### Agent Setup
 
-- [X] Installed official Docker sandbox image for claude-code with `/login` to my subscription
 - [X] Install and test goose
-- [X] Connect my Claude subscription via ACP
-- [ ] Run goose from Docker Sandbox
+- [X] Connect Claude subscription via ACP (local dev)
+- [X] Containerize goose — headless, API key, zero interactive setup
+- [X] Drive goose programmatically over ACP
+- [ ] `gh` CLI in the image
+- [ ] Agent SSH key — clone, push, signed commits
 
 ### Orchestration
 
-- [ ] Connect sandboxed goose with `agent-manager`
-  - [ ] Wire it to the sandbox — point a pane at `sbx exec`/`ssh`, not a bare process
-  - [ ] Does hook-based status survive the ACP bridge, or silently degrade to screen-inference?
-  - [ ] Worktree collision — agent-manager spawns worktrees, so does `sbx`
-- [ ] Connect agent-manager and Zed/claude-code as orchestrator to assign geese.
+- [ ] Phase 1 — local `kind` cluster, `kubectl apply` a Job, push a branch
+- [ ] Phase 2 — GitHub webhook triggers the Job
+- [ ] Phase 3 — TBD, whatever the first two make obvious
 
 ### Customization
 
 - [ ] Package custom skills, MCP servers, plugins with goose agent.
 - [ ] Deploy custom goose-agent as Docker image
-- [ ] Integrate custom goose-agent with Docker Sandbox
 
 ## Decision Log
 
-| Date | Decision |
+| Decision | Notes |
 |---|---|
-| — | `.claude/settings.json` allow/deny rules are a deterrent, not a boundary. |
-| — | Dev containers (Level 1) = default for real isolation. |
-| — | Full VM reserved for actively-suspect code, not everyday use. |
-| Incident | `~/.claude.json` bind-mounted into a devcontainer. Concurrent write truncated it, blocked new sessions. |
-| Resolved | Never mount `~/.claude.json`. Mount `~/.claude` only, mirror the workspace path. |
-| Found | Docker Sandboxes (`sbx`) — stronger than devcontainers (microVM, isolated daemon). CLI-only, no Zed integration. |
-| Found | `sbx setup ssh` + agent forwarding = sandbox SSH access and commit signing without copying the key. Experimental, not verified. |
-| Found | goose fronts Claude via ACP, reusing my subscription. Gap: no session resume/fork on ACP. |
-| Found | herdr and agent-manager both viable. Neither is `sbx`-aware. agent-manager fits the worktree/review workflow better. |
-| Rejected | Orca as session-manager / `sbx` front-end. Not sandbox-aware, owns its own worktree layer, provides no isolation. |
-| Open | Container Use for true multi-session parallel isolation. |
-| Open | **Next: layered spike.** Layer 1 = goose+ACP+Claude in `sbx`. Layer 2 = agent-manager on top. |
+| Isolation | `settings.json` allow/deny rules are a deterrent, not a boundary. Container is the boundary. |
+| My session | Dev container in Zed. Interactive, me in the loop. |
+| Harness | goose. Model-agnostic, headless, AAIF-governed — no vendor lock-in. |
+| LLM auth | API keys for headless agents. ACP on my Claude subscription for local dev only. |
+| Agent identity | Own GitHub account and ED25519 key. Deploy keys can't sign commits. |
+| Orchestration | K8s `Job`, one task per pod, fire-and-die. No sidecar — ACP is native to goose. |
+| No nested agents | One task, one goose, one pod. Specialization comes from what I dispatch, not from a goose spawning subagents. |
+
+### Retired
+
+| | Why |
+|---|---|
+| Docker Sandbox (`sbx`) | Worked, but local-machine only. Doesn't lead to remote agents. |
+| `agent-manager` / session managers | Built for attaching to interactive panes. Webhook → pod → PR has no pane. |
+
+Detail in [`stale/`](./stale/).
 
 ## References
 
