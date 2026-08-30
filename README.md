@@ -122,3 +122,8 @@ Loose wording now to capture what's needed.
 | Rejected | Orca as session-manager / `sbx` front-end. Not sandbox-aware, owns its own worktree layer, provides no isolation. |
 | Open | Container Use for true multi-session parallel isolation. |
 | Open | **Next: layered spike.** Layer 1 = goose+ACP+Claude in `sbx`. Layer 2 = agent-manager on top. |
+
+## References
+
+- [agents.md](https://agents.md/)
+- [goose](https://goose-docs.ai/) - open source AI Agent (part of [AAIF](https://github.com/aaif-goose/goose))
