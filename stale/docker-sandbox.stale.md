@@ -1,5 +1,8 @@
 # Sandbox - isolate the agent
 
+> [!WARNING]
+> This design is stale and was retired on 30 August 2026. Refer to latest design in [architecture/](./../architecture/README.md).
+
 Without some level of hardware isolation… _technically_ your coding agent can access everything _you_ have access to:
 
 ![Sandbox isolation](../images/sandbox-isolation.svg) 
@@ -97,3 +100,10 @@ This is what makes it Layer 1 (isolation), not Layer 2 (convenience) — a hyper
 - [Sandvault](https://github.com/webcoyote/sandvault) – used by Homebrew maintainer [Mike McQuaid](https://mikemcquaid.com/sandboxed-agent-worktrees-my-coding-and-ai-setup-in-2026/), but its security model is managed vy user-privileges via separate user accounts on the mac. Not enough isolation.
 - [Sprites](https://fly.io/sprites/) – hosted infra with usaged based pricing.
 - [LimaVM](https://github.com/lima-vm/lima) – minimal VM setup for [Joy Heron's workflow](https://www.innoq.com/en/blog/2025/12/dev-sandbox/). I want to try containers first.
+
+
+```shell
+sbx shell
+sudo apt update && sudo apt install bzip2
+curl -fsSL https://github.com/aaif-goose/goose/releases/download/stable/download_cli.sh | bash
+```

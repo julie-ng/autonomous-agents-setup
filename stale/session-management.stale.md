@@ -1,5 +1,8 @@
 # Session Management
 
+> [!WARNING]
+> This design is stale and was retired on 30 August 2026. Refer to latest design in [architecture/](./../architecture/README.md).
+
 The convenience layer. Dashboards, status, reply-in-place, diff review.
 
 > [!IMPORTANT]
