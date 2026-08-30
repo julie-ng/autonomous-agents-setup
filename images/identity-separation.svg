@@ -5,12 +5,12 @@
         fill="none" stroke="#6b7280" stroke-width="1"/>
   <text x="140" y="45" font-size="14" font-weight="600" fill="#6b7280">💻 Host</text>
 
-  <!-- Sandbox (left half, solid grey) -->
+  <!-- Container (left half, solid grey) -->
   <rect x="145" y="60" width="175" height="108" rx="6"
         fill="none" stroke="#6b7280" stroke-width="1"/>
-  <text x="163" y="82" font-size="12" font-weight="600" fill="#6b7280">🐳 Sandbox</text>
+  <text x="163" y="82" font-size="12" font-weight="600" fill="#6b7280">🐳 Container</text>
 
-  <!-- agent nested inside sandbox — green -->
+  <!-- agent nested inside container — green -->
   <rect x="160" y="94" width="145" height="60" rx="6"
         fill="#f4fce8" stroke="#7cb342" stroke-width="1" stroke-dasharray="5 4"/>
   <text x="174" y="114" font-size="12" font-weight="600" fill="#7cb342">🪿 Agent</text>

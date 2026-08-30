@@ -18,7 +18,7 @@ One key, registered twice:
 - as an **authentication key** → push access
 - as a **signing key** → commits get the green "Verified" badge under the agent's name, not mine
 
-Per-repo config (`git config --local`), never global:
+Set at clone time — the pod is disposable, so there's nothing to inherit:
 
 ```sh
 user.name / user.email     # agent identity
@@ -48,54 +48,53 @@ The agent's only outbound write is **pushing to its own branch**.
 
 ## LLM auth
 
-| | Now | Target |
+Depends on who's driving.
+
+| | Human-driven (local dev) | Headless (remote agent) |
 |---|---|---|
-| **Model** | Claude only | Model-agnostic, e.g. `codex`, `qwen`. |
-| **Mechanism** | ACP | API token |
-| **Binding** | Personal Claude Subscription | API token |
+| **Mechanism** | ACP → Claude Code CLI | API key |
+| **Binding** | My Claude subscription | Agent's own credential |
+| **Model** | Claude only | Model-agnostic, e.g. `codex`, `qwen` |
 
-Target: remote agents on API tokens. Own credential. No human account in the loop. Swappable model.
+ACP is a local-dev convenience — it borrows my subscription, so there's a human in the loop by definition. Headless agents get their own API key and no human account is involved.
 
-### Claude – via ACP (today)
+> [!NOTE]
+> The agent has its own GitHub identity in both cases. Only the *LLM* credential differs.
 
-goose reaches Claude only via **ACP** (`claude-agent-acp`), driving the Claude Code CLI. Not a native goose provider.
+## Getting the key into the pod
 
-- Credential stays on the host. A sentinel crosses into the sandbox. Proxy substitutes outbound. Better than mounting `~/.claude/.credentials.json`.
-- No `session resume` / `session fork` on ACP providers. Collides with sandbox pause/resume. Plan around it.
+SSH key as a K8s Secret, mounted into the init container that clones.
 
-A bridge, not the destination. API tokens use goose's native providers — ACP drops out.
+```yaml
+volumes:
+  - name: ssh-key
+    secret:
+      secretName: agent-ssh-key
+      defaultMode: 0400        # ssh refuses group/world-readable keys
+```
 
-## Getting the key into the sandbox
+- One key does clone, push, and signing. No separate `GITHUB_TOKEN` — SSH covers all three.
+- `defaultMode: 0400` is load-bearing. SSH rejects a key with looser permissions.
+- Private key is in the pod, not on my machine. Different trade-off than agent forwarding: the key exists at rest inside the container, so it's scoped to one repo and rotatable rather than protected by never crossing a boundary.
 
-Two candidate mechanisms. **Neither verified hands-on** — spike pending.
-
-- **Option 1 - SSH agent forwarding**
-  - host agent holds the key, 
-  - `SSH_AUTH_SOCK` forwarded in. 
-  - Sandbox can request signatures, cannot read or copy the private key.
-  - Requires a *scoped* agent holding only the agent key
-  
-- **Option 2 - Credential substitution** — `sbx secret set`
-  - placeholder inside, 
-  - proxy substitutes on outbound requests.
-  - Sandbox's default template expects `GITHUB_TOKEN`, but I want to authN via SSH key.
-
-Agent forwarding is the better fit for signing. To confirm in a spike.
+> [!IMPORTANT]
+> **Not yet built.** Nothing has pushed a branch from a container.
 
 ## Decision log
 
 | Decision | Notes |
 |---|---|
 | GitHub identity | Own account, not just a deploy key. Deploy keys can't sign. |
-| Key | One ED25519, registered as both auth and signing key. |
-| Git config | Per-repo only. `IdentitiesOnly=yes`. |
+| Key | One ED25519 — clone, push, and signing. No separate token. |
+| Git config | Set at clone time. `IdentitiesOnly=yes`. |
 | Write scope | Push to own branch. Downstream via hooks, inputs via orchestrator. |
-| AuthN (local dev) | ACP on my Claude subscription. |
-| AuthN (remote agent) | API tokens, vendor-agnostic. |
+| LLM auth (human-driven) | ACP on my Claude subscription. |
+| LLM auth (headless) | API keys, vendor-agnostic. |
+| Key delivery | K8s Secret mounted `0400` into the init container. |
 
 ### Accepted Trade-Offs
 
 | Tradeoff | Notes |
 |---|---|
-| Agent borrows my LLM identity | Local dev only. Own GitHub identity is unaffected. Remote agents get their own API token. |
-| Re-trusting per sandbox | Credentials don't cross the boundary automatically. Cost of not mounting `~/.claude`. |
+| Agent borrows my LLM identity | Local dev only. GitHub identity is separate either way. |
+| Private key at rest in the pod | Scoped to one repo and rotatable. Weaker than never crossing a boundary, but the pod is disposable. |
