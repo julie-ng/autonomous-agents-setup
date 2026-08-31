@@ -1,12 +1,12 @@
 # Phase 1: Local Kubernetes POC
 
-**Objective:** Validate containerized, single-process goose execution on a local cluster (`kind` or `minikube`). No gVisor, no sidecars, no operators, no CRDs.
+**Objective:** Validate containerized, single-process goose execution on a local `k3d` cluster. No gVisor, no sidecars, no operators, no CRDs.
 
 **Goal:** a `kubectl apply` produces a pushed branch.
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────────┐
-│ LOCAL KUBERNETES CLUSTER (kind / minikube)                                      │
+│ LOCAL KUBERNETES CLUSTER (k3d)                                                  │
 │                                                                                 │
 │  ┌───────────────────────────────────────────────────────────────────────────┐  │
 │  │ Kubernetes Job (goose-poc-job)                                            │  │

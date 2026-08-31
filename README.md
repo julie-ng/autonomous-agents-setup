@@ -79,7 +79,7 @@ Spikes and working code: [`spikes/`](./spikes/). Retired directions: [`stale/`](
 
 ### Orchestration
 
-- [ ] Phase 1 — local `kind` cluster, `kubectl apply` a Job, push a branch
+- [ ] Phase 1 — local `k3d` cluster, `kubectl apply` a Job, push a branch
 - [ ] Phase 2 — GitHub webhook triggers the Job
 - [ ] Phase 3 — TBD, whatever the first two make obvious
 
