@@ -1,0 +1,9 @@
+{
+  "name": "Claude Node Sandbox",
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:22",
+  "workspaceMount": "source=${localWorkspaceFolder},target=/Users/username/Workspace/path/to/project,type=bind,consistency=cached",
+  "workspaceFolder": "/Users/username/Workspace/path/to/project",
+  "mounts": [
+    "source=${localEnv:HOME}/.claude,target=/home/node/.claude,type=bind,consistency=cached"
+  ]
+}

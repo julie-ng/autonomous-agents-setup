@@ -2,3 +2,4 @@
 .env
 .agents/
 .claude/skills/eraser-diagrams
+.devcontainer/devcontainer.json
