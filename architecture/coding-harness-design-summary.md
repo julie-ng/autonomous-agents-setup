@@ -1,6 +1,6 @@
 # Coding harness design — summary
 
-A harness = a loop + tools + guidance/context + gates. Not one thing — scaffolding that turns an LLM into an agent that can act on a repo.
+This document describes a coding harness built on top of [goose](https://goose-docs.ai/) — itself a harness framework. We're building a harness, assembled *from* Goose's primitives (orchestrator + N sub-agents, code-gated inner loops, cycle guards).
 
 ## Working architecture (current state)
 
@@ -9,7 +9,7 @@ A harness = a loop + tools + guidance/context + gates. Not one thing — scaffol
 - Orchestrator + N sub-agents, each a standalone outer loop; orchestrator is a role by position, not a distinct type.
 - Delegation as a recursive tool call, with a manually-enforced cycle guard given limited depth.
 - State/context passed explicitly across delegation boundaries, never assumed shared.
-- Goose as the runtime: Skills extension for discovery, Summon extension for delegation, Recipes for config — no plugin needed for internal use.
+- Goose as the harness framework: Skills extension for discovery, Summon extension for delegation, Recipes for config — no plugin needed for internal use.
 - Web UI: deferred until Goose's ACP-over-HTTP transport stabilizes; likely path is the AI SDK community ACP provider once/if Goose compatibility is confirmed.
 
 
