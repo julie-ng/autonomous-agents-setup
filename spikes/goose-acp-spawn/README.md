@@ -8,7 +8,7 @@
 
 | | |
 |---|---|
-| `Dockerfile` | `goose-in-a-box`. See [containerizing-goose.md](../containerizing-goose.md) for the gotchas. |
+| `Dockerfile` | `goose-in-a-box`. See [goose-k8s-prep](../goose-k8s-prep/README.md) for the gotchas. |
 | `goose.config.yaml` | Baked provider config. Vercel AI Gateway → `openai/gpt-5-mini`. |
 | `goose-acp-client.ts` | Minimal ACP client. Spawns `goose acp`, handshake, one prompt, prints updates. |
 
