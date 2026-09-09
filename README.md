@@ -64,7 +64,7 @@ The point is not to babysit sessions. No approving every change, no manually pus
 | [Identity](./architecture/identity.md) | Agent vs. me. Own GitHub account, own SSH key. |
 | [Orchestration](./architecture/orchestration.md) | GitHub → K8s Job → branch → PR |
 
-Spikes and working code: [`spikes/`](./spikes/). Retired directions: [`stale/`](./stale/).
+Spikes and working code: [`spikes/`](./spikes/). Retired directions: [`stale/`](./stale/). Deferred decisions, reasoning kept: [`architecture/parked/`](./architecture/parked/).
 
 ## Current Progress
 
