@@ -55,11 +55,29 @@ Goose has native subagent support via the **Summon** extension, which loads know
 The Goose config-structure diagram lays out how the pieces fit:
 
 - **Recipe** — the top-level config: instructions/prompt, which extensions are enabled, parameters, model settings, and `sub_recipes` for delegation. This is the AGENTS.md-equivalent plus wiring.
-- **Extensions** — the base capability mechanism (built-in platform extensions or external MCP servers). Two matter here: the **Skills extension**, which discovers skills from a registry (`.agents/skills/` project-level, `~/.config/agents/skills/` global); and the **Summon extension**, which delegates to sub-agents using skills + recipes as sources.
+- **Extensions** — the base capability mechanism (built-in platform extensions or external MCP servers). Two matter here: the **Skills extension**, which discovers skills from a registry (`.agents/skills/` project-level, `~/.agents/skills/` global — legacy `.goose/skills/`, `~/.config/goose/skills/` and `~/.claude/skills/` are still read for back-compat); and the **Summon extension**, which delegates to sub-agents using skills + recipes as sources.
 - **Skill registry** — where the many existing skills actually live and get discovered from; not something recipes configure directly.
 - **Plugins** — optional, a packaging/distribution format only. A plugin installs into three separate places at once (skill registry, recipes, config) — it does not route through any one of them. **Decision: not needed** for internal reorg of existing skills; only relevant if distributing the setup as one installable bundle across a team.
 
 **Gap carried over from framework:** Goose's `max_turns` caps a single sub-agent's own run, not cross-tree call-chain depth — the cycle guard remains a manual responsibility.
+
+**Gap — skills have no governance layer.** Tools and skills are not symmetrical:
+
+| | Scoping | Where |
+|:--|:--|:--|
+| Extensions (tools) | per-recipe `extensions:`, plus an Extension Allowlist | config |
+| Skills | **none** | filesystem discovery only |
+
+A recipe declares which extensions it gets. It cannot declare which skills it gets — the Skills extension is on or off, and the model then picks from whatever is in the registry, based on skill descriptions. There is no allowlist, no `skills:` recipe field, and no `GOOSE_SKILLS_PATH` (verified against current docs, 2026-09-09).
+
+Consequences for the design:
+
+- **Different agent types can't be expressed as different recipes** if they need different skill sets. The skill set is a property of the filesystem, so it becomes a property of the *image* (or of whatever is mounted at `~/.agents/skills/`) — not of the agent's config.
+- **A filesystem convention is not a boundary.** The registry is just directories (`~/.agents/skills/`, `.agents/skills/`). Anything that can write them changes what the agent will do, and nothing in goose's config expresses intent about it. goose does not distinguish skills an operator installed at build time from files that appeared afterwards. Per this repo's own framing, that is a convention, not an enforcement mechanism.
+- **A cloned repo can extend the agent's capabilities.** Project-level skills are discovered relative to the working directory and merge with the global set — observed in the spike, where mounting `tally-split-ai` added its `.claude/skills/` to `goose skills list` alongside the image's. Useful, and also the sharp edge: **Phase 1 has the agent clone a repo, so a repo carrying `.agents/skills/` (or a legacy `.claude/skills/`) contributes skills to the run.** The agent also runs as the owner of its own global registry and ships `writing-skills`, so it can author skills there mid-session. Whether repo-supplied skills are acceptable needs deciding deliberately — currently nothing prevents it and nothing records the choice.
+- **An installed skill can hijack an unattended run.** Observed in [`../spikes/goose-container/`](../spikes/goose-container/): superpowers' `brainstorming` (*"You MUST use this before any creative work"*) auto-loaded and ended two headless runs with an unanswered confirmation prompt — exit 0, no output, no error. Neither the recipe nor the operator selected it. The working mitigation is prompt text naming the skill to avoid, which is not enforcement and breaks if the skill's description changes.
+
+Practical implication for Phase 1: an image intended for unattended Jobs should not ship confirm-first skills at all, and the Job should assert on the produced artifact rather than the exit code.
 
 **State in Goose:** state ≈ the raw conversation transcript, auto-compacted near token limits — not a structured/queryable state object like LangGraph's typed, checkpointed schema. Practical implication: no shared state store between delegated agents; anything a sub-agent needs must be passed explicitly in its task/context, same as the cycle-guard chain. Worth validating later whether auto-compaction could silently drop details a gate depends on (a documented pain point across coding agents generally, not unique to Goose).
 

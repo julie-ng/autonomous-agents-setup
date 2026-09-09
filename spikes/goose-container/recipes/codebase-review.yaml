@@ -1,0 +1,75 @@
+version: "1.0.0"
+title: "Codebase review"
+description: "Non-trivial task for testing the agent against a real project: orient in an unfamiliar codebase and produce a grounded review. Exercises skill discovery, file tools, and multi-step reasoning — not a hello-world."
+
+parameters:
+  - key: repo_path
+    input_type: string
+    requirement: required
+    description: "Absolute path to the mounted repository to review"
+
+  - key: focus
+    input_type: string
+    requirement: optional
+    default: "architecture and conventions"
+    description: "What to concentrate on, e.g. 'test coverage', 'error handling'"
+
+prompt: |
+  You are running HEADLESS. There is no human in this session and no way to
+  answer you. Do not ask for confirmation, do not propose a plan and wait for
+  approval, do not end a turn with a question. Begin work immediately and run
+  to completion in one pass.
+
+  Do NOT load `brainstorming`, `using-superpowers`, `writing-plans`, or any
+  skill whose protocol is to classify the task and confirm a plan first. They
+  are written for interactive sessions and will end this run with an unanswered
+  question. If one loads anyway, ignore its confirmation step entirely and
+  continue to the review.
+
+  Review the codebase at {{ repo_path }}, focusing on {{ focus }}.
+
+  Your shell does NOT start in {{ repo_path }} — it starts in the home
+  directory. Begin by running `cd {{ repo_path }}`, and prefix every path with
+  {{ repo_path }} regardless. Bare relative paths like `README.md` will fail.
+
+  You may consult project-specific skills found under the repo itself if they
+  document its conventions. Do not survey the global skill registry.
+
+  Then:
+
+  1. **Orient.** Read AGENTS.md / CLAUDE.md / README.md if present (all under
+     {{ repo_path }}). Identify the stack, entry points, and test setup. State
+     what kind of project it is.
+  2. **Verify, don't assume.** Every claim about this codebase must come from
+     a file you actually read. Cite `path:line` for each one.
+  3. **Review** against {{ focus }}. Find concrete, specific issues — a real
+     inconsistency with a location beats a generic best-practice observation.
+  4. **Check the project's own rules.** If it documents conventions, find
+     whether the code actually follows them. Deviations are the finding.
+
+  Output:
+  - **Project summary** — 3-5 bullets
+  - **Findings** — table: Finding | Location | Why it matters
+  - **Coverage** — how many top-level entries the repo has, how many you
+    actually read, and which significant directories you did not open.
+    State counts, e.g. "read 5 of 52 top-level entries; did not open
+    server/, trigger/, tests/". "None" is not a valid answer here.
+
+  IMPORTANT:
+  - Do not invent findings to fill the table. An empty findings table with an
+    honest "nothing significant found" is a valid result.
+  - Do not modify any files. This is read-only.
+  - If you could not read something you needed, say so in Unverified rather
+    than guessing at its contents.
+
+extensions:
+  - type: builtin
+    name: developer
+  - type: builtin
+    name: skills
+
+# Bounded so an unattended run can't explore indefinitely. A large repo will hit
+# this — that's the point; better a truncated review than an unbounded spend.
+# Raise deliberately if reviews are getting cut off mid-analysis.
+settings:
+  max_turns: 40

@@ -1,0 +1,44 @@
+version: "1.0.0"
+title: "Container smoke test"
+description: "Verifies the image's toolchain and skill discovery from inside a goose run. Fails loudly rather than reporting success on a partial environment."
+
+# Headless: `prompt` is what runs with `goose run --recipe smoke-test.yaml`.
+prompt: |
+  You are running HEADLESS. There is no human in this session and no way to
+  answer you. Do not ask for confirmation or end a turn with a question —
+  begin immediately and run to completion in one pass.
+
+  Verify this container is correctly provisioned. Work through every step —
+  do not stop at the first success, and do not report success for a step you
+  did not actually run.
+
+  1. Run each of these and record the actual output:
+     `goose --version`, `uv --version`, `node --version`, `npm --version`,
+     `python3 --version`, `jq --version`, `yq --version`, `git --version`
+  2. Run `goose skills list` and report how many skills were discovered and
+     from which source directories.
+  3. Confirm you are NOT root: run `id` and `whoami`.
+  4. Confirm privilege escalation is NOT possible: run `sudo -n true`.
+     Expected: non-zero exit with "a password is required" or "not in the
+     sudoers file". The `sudo` binary IS present on this base image — that is
+     expected and not a failure. What must fail is the escalation itself.
+     Do not use `command -v sudo` for this; it only proves the file exists.
+  5. Write /tmp/smoke.txt, read it back, delete it — proves the developer
+     extension's file tools work.
+
+  Then output a markdown table: Check | Result | Pass/Fail.
+
+  IMPORTANT: If any command is missing or errors, mark it FAIL and show the
+  actual error text. A partially-provisioned container reported as healthy is
+  the failure mode this recipe exists to catch.
+
+extensions:
+  - type: builtin
+    name: developer
+  - type: builtin
+    name: skills
+
+# Fixed checklist, so this should never approach the bound. If it does, the
+# model is looping rather than working through the list.
+settings:
+  max_turns: 25
