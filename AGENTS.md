@@ -3,9 +3,10 @@
 Rules for any agent working in this repo, regardless of harness or model.
 
 > [!NOTE]
-> Harness-agnostic by design — this repo is tested against goose and multiple
-> model providers. Claude Code additionally reads [CLAUDE.md](./CLAUDE.md); the
-> rules here are the subset that applies everywhere.
+> **This is the single source of truth.** [CLAUDE.md](./CLAUDE.md) is a stub
+> that imports this file via `@AGENTS.md`. Harness-agnostic by design — the repo
+> is tested against goose and multiple model providers, so rules live here and
+> only Claude-Code-specific additions belong in CLAUDE.md.
 
 ## About this repo
 
@@ -26,7 +27,10 @@ Rules for any agent working in this repo, regardless of harness or model.
 - Give the mechanism, not "it's handled."
 - Don't invent detail to fill a table cell. An empty cell is honest; a
   plausible guess is not.
-- Prefer primary sources. Note the trust tier when it's not obvious.
+- Prefer primary sources. Note the trust tier when it's not obvious:
+  primary/authoritative vs. secondary vs. don't-cite.
+- Ask who else writes a shared resource before concurrency bites.
+- **These notes justify a security boundary — wrong details are load-bearing.**
 
 ## Security framing
 
