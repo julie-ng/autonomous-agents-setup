@@ -1,43 +1,65 @@
 # goose-in-a-box — headless goose for the Phase 1 K8s Job.
 #
-# Differs from ../goose-acp-spawn/Dockerfile: no ACP client. Phase 1 runs
-# `goose run --text "$TASK_PROMPT"` — fire-and-die, one process.
+# Inherits from the official goose image rather than installing goose onto a
+# node base. Upstream builds the binary stripped (CARGO_PROFILE_RELEASE_STRIP,
+# OPT_LEVEL=z), which is why their image is ~half the size of the old build.
+#
+# The base ships goose, git, curl, bash and nothing else — no python3, node,
+# npm, gh, jq. All added back here.
 #
 #   docker build -t goose-in-a-box:dev .
-#
-# NOT YET BUILT. See README "Status".
 
-FROM node:22.23.2-bookworm-slim
+FROM ghcr.io/aaif-goose/goose:v1.48.0
 
-# Pinned. Bump deliberately, not by rebuilding.
-ARG GOOSE_VERSION=v1.48.0
+# Upstream user is `goose` (uid 1000), home /home/goose. Same uid the Phase 1
+# securityContext pins — only the name and home differ from the old node base.
+USER root
+
 ARG GH_VERSION=2.99.0
+ARG NODE_MAJOR=24
+ARG TYPESCRIPT_VERSION=5.9.3
+ARG SKILLS_CLI_VERSION=1.5.25
 
-# --- root: system deps ---
-# bzip2          — goose release tarball is .tar.bz2, not in slim images
-# ca-certificates — TLS for the model gateway
-# openssh-client — git clone/push over SSH. `git` only *recommends* it, and
-#                  --no-install-recommends means it is not pulled in.
+# python3      — agents reach for `python3` by convention; without it a task
+#                that writes tests cannot run them (observed: run of issue #3,
+#                which shipped untested code and burned turns trying to build
+#                CPython from source)
+# ripgrep      — the model reaches for `rg` and falls back when absent
+# jq           — JSON wrangling, and the agent's own use
+# ca-certificates/curl/git — already in the base, not reinstalled
 RUN apt-get update \
   && apt-get install -y --no-install-recommends \
-       bzip2 \
-       ca-certificates \
-       curl \
-       git \
+       python3 \
+       python3-venv \
+       ripgrep \
+       jq \
        openssh-client \
-  && rm -rf /var/lib/apt/lists/*
+  && rm -rf /var/lib/apt/lists/* \
+  && python3 --version && rg --version | head -1 && jq --version
 
-# --- goose ---
-# GOOSE_BIN_DIR defaults to $HOME/.local/bin → /root/.local/bin at build time,
-# which is unreachable after `USER node`. Pin it somewhere on the global PATH.
-ENV GOOSE_BIN_DIR=/usr/local/bin
-RUN curl -fsSL https://github.com/aaif-goose/goose/releases/download/stable/download_cli.sh \
-      | GOOSE_VERSION="${GOOSE_VERSION}" CONFIGURE=false bash \
-  && goose --version
+# --- node + npm, for npx-based MCP servers ---
+# NodeSource apt source. The base has no node at all, unlike the old image.
+RUN curl -fsSL https://deb.nodesource.com/setup_${NODE_MAJOR}.x | bash - \
+  && apt-get install -y --no-install-recommends nodejs \
+  && rm -rf /var/lib/apt/lists/* \
+  && node --version && npm --version
+
+# --- typescript + tsx, global ---
+# `tsx` runs .ts directly, no build step — the form an agent reaches for.
+# Installed globally so it is on PATH for any uid, not just goose.
+RUN npm install -g \
+      typescript@${TYPESCRIPT_VERSION} \
+      tsx \
+      skills@${SKILLS_CLI_VERSION} \
+  && tsc --version && tsx --version && skills --version
+
+# npm install -g ran as root and creates /home/goose/.npm root-owned, which
+# makes any later npm/npx call as `goose` fail with EACCES. Hand it back.
+RUN chown -R goose:goose /home/goose
 
 # --- gh CLI ---
-# Pinned tarball rather than the apt repo: no extra apt source, no floating latest.
-# Needed for Phase 2 PR creation. Unused in Phase 1 — see README.
+# Pinned tarball, not the apt repo: apt floats the version (measured: gave
+# 2.100.0 against a 2.99.0 pin) and pulls in gnupg. Same ~39MB binary either way.
 RUN set -eux; \
     arch="$(dpkg --print-architecture)"; \
     curl -fsSL -o /tmp/gh.tgz \
@@ -48,24 +70,32 @@ RUN set -eux; \
     gh --version
 
 # Mountpoint for the init container's clone (emptyDir, fsGroup 1000).
-# WORKDIR alone would create this root-owned. Matters for plain `docker run`;
-# in K8s the volume mount replaces it.
-RUN mkdir -p /workspace && chown node:node /workspace
+# WORKDIR alone would create this root-owned.
+RUN mkdir -p /workspace && chown goose:goose /workspace
 
-# --- drop privileges: `node` ships with the base image (uid 1000) ---
-# uid 1000 is what the Phase 1 securityContext pins. Keep them in sync.
-USER node
+# Baked provider config. Secrets never baked — AI_GATEWAY_API_KEY arrives at
+# runtime via secretKeyRef. In K8s this becomes a ConfigMap mounted with subPath,
+# so it replaces the one file and not the whole goose/ directory.
+COPY --chown=goose:goose goose.config.yaml /home/goose/.config/goose/config.yaml
 
-# goose writes config and session state under $HOME. `USER` alone does not set it.
-ENV HOME=/home/node
+# Recipes are baked; the task is chosen per run via --recipe + --params.
+COPY --chown=goose:goose recipes/ /recipes/
+
+# goose writes logs to ~/.local/state and session state to ~/.local/share, and
+# creates neither. Upstream's `chown -R /home/goose` runs before the COPY above,
+# so the parents COPY creates land root-owned. Without this, goose starts but
+# emits "Failed to initialize logging: Permission denied" — an unattended pod
+# with no logs, which defeats the visibility goal.
+RUN mkdir -p /home/goose/.local/state/goose/logs \
+             /home/goose/.local/share/goose \
+  && chown -R goose:goose /home/goose
+
+# --- drop privileges last ---
+USER goose
 WORKDIR /workspace
 
-# Baked provider config. Secrets are never baked — AI_GATEWAY_API_KEY comes in
-# at runtime via secretKeyRef. In K8s this file becomes a ConfigMap mounted with
-# subPath, so it replaces the one file and not the whole goose/ directory.
-# COPY creates parents automatically; --chown is required, COPY defaults to root.
-COPY --chown=node:node goose.config.yaml /home/node/.config/goose/config.yaml
-
-# node:*-slim defaults to the Node REPL. The Job overrides this with command/args;
-# bash is for poking around interactively.
+# The base sets ENTRYPOINT to the goose binary, so `docker run <img> run --recipe`
+# works directly. Reset it: the Job's shell wrapper needs to run goose *and then*
+# assert on the artifact, commit and push — it cannot do that if goose is pid 1.
+ENTRYPOINT []
 CMD ["bash"]
