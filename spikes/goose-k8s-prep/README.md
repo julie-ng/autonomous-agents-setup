@@ -11,6 +11,14 @@
 
 Prior art: [`../goose-acp-spawn/Dockerfile`](../goose-acp-spawn/Dockerfile) — the ACP variant, built and verified 30 Aug 2026.
 
+> [!IMPORTANT]
+> **Read [`../goose-container/`](../goose-container/) before building this.** That spike ran goose headlessly end to end (2026-09-09) and found things that apply directly to the Phase 1 Job:
+>
+> - **A skill can silently kill an unattended run.** superpowers' `brainstorming` auto-loaded and ended two runs with an unanswered confirmation prompt — exit 0, no error, no output. **A Job would read that as success.** Assert on the produced artifact, not the exit code.
+> - **`max_turns` is the only bound in the recipe schema.** There is no timeout field — wall-clock has to come from `activeDeadlineSeconds`.
+> - **Recipes need `prompt`** (not `instructions`) for headless `goose run`, and the CWD must be the repo (`-w`, or `workingDir`) or the model wastes turns on failed relative paths.
+> - Skills are discovered from `~/.agents/skills/` and merged with any `.agents/skills/` or `.claude/skills/` in the cloned repo — see [`../../architecture/parked/skills-distribution-and-governance.md`](../../architecture/parked/skills-distribution-and-governance.md).
+
 ## Scope — no ACP client
 
 Phase 1 runs `goose run --text "$TASK_PROMPT"`. Fire-and-die, one process, no client. So this image drops `tsx`, `@agentclientprotocol/sdk`, and `goose-acp-client.ts`.
