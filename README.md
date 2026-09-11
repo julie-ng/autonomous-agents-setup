@@ -61,7 +61,7 @@ The point is not to babysit sessions. No approving every change, no manually pus
 | [Isolation levels](./architecture/README.md) | What counts as a boundary, what's only a deterrent |
 | [Dev container](./architecture/dev-container.md) | My interactive session. Current setup. |
 | [goose](./architecture/goose-agent.md) | The agent runtime. ACP built in, model-agnostic. |
-| [Identity](./architecture/identity.md) | Agent vs. me. Own GitHub account, own SSH key. |
+| [Identity](./architecture/identity.md) | Agent vs. me. Two tiers: bot account + deploy key locally, GitHub App in the cloud. |
 | [Orchestration](./architecture/orchestration.md) | GitHub → K8s Job → branch → PR |
 
 Spikes and working code: [`spikes/`](./spikes/). Retired directions: [`stale/`](./stale/). Deferred decisions, reasoning kept: [`architecture/parked/`](./architecture/parked/).
@@ -74,8 +74,9 @@ Spikes and working code: [`spikes/`](./spikes/). Retired directions: [`stale/`](
 - [X] Connect Claude subscription via ACP (local dev)
 - [X] Containerize goose — headless, API key, zero interactive setup
 - [X] Drive goose programmatically over ACP
-- [ ] `gh` CLI in the image
-- [ ] Agent SSH key — clone, push, signed commits
+- [x] `gh` CLI in the image — pinned, and the credential is settled for the spike: a PAT on the agent account. [Detail](./spikes/goose-k8s-prep/).
+- [x] Agent identity — issue read, branch pushed, PR opened as `julieio-goose`. **Via PAT, not SSH** — direction change, see the spike's decision log. Signing deferred.
+- [ ] Workload identity — the likely endpoint, replacing long-lived credentials. Details in a later phase.
 
 ### Orchestration
 
@@ -96,7 +97,7 @@ Spikes and working code: [`spikes/`](./spikes/). Retired directions: [`stale/`](
 | My session | Dev container in Zed. Interactive, me in the loop. |
 | Harness | goose. Model-agnostic, headless, AAIF-governed — no vendor lock-in. |
 | LLM auth | API keys for headless agents. ACP on my Claude subscription for local dev only. |
-| Agent identity | Own GitHub account and ED25519 key. Deploy keys can't sign commits. |
+| Agent identity | Own GitHub identity, split by tier — bot account + deploy key locally, GitHub App (`…[bot]`) for autonomous pods. PAT during the spike. |
 | Orchestration | K8s `Job`, one task per pod, fire-and-die. No sidecar — ACP is native to goose. |
 | No nested agents | One task, one goose, one pod. Specialization comes from what I dispatch, not from a goose spawning subagents. |
 
