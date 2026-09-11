@@ -35,7 +35,7 @@
 
 1. **Single container execution.** goose natively handles model context, tool calling, and self-correction, and has ACP built in. No sidecars, no outer framework.
 2. **Native K8s primitives.** `Job`, `Secret`, `ConfigMap`. Nothing custom until these prove insufficient.
-3. **Non-root, SSH identity.** Rootless execution enforced via `securityContext`. Agent authenticates and signs with its own key — see [identity.md](../architecture/identity.md).
+3. **Non-root, own identity.** Rootless execution enforced via `securityContext`. Agent authenticates as itself, not as me — see [identity.md](../architecture/identity.md). **The mechanism has changed:** the cloud tier targets a GitHub App with short-lived installation tokens, not the SSH key this manifest still assumes.
 
 ---
 
@@ -43,15 +43,12 @@
 
 The agent has its own GitHub account: **`julieio-goose`**.
 
-One ED25519 key does everything:
-
-- **clone + push** — authentication key on the account
-- **commit signing** — same key registered as a signing key, so commits get "Verified" under the agent's name
-
-No `GITHUB_TOKEN`. SSH covers all three.
-
 > [!IMPORTANT]
-> `IdentitiesOnly=yes` in `core.sshCommand`. Without it SSH offers every key it can find.
+> **Superseded — this section describes the old SSH-only model.** It assumed the agent's work ended at a pushed branch. Reading issues and opening PRs needs the REST API, which takes a token — so the identity model was reconsidered. [identity.md](../architecture/identity.md) now splits identity into a local tier (bot account + deploy key) and a cloud tier (**GitHub App**, 1-hour installation tokens). A webhook-triggered pod is the cloud tier.
+>
+> The manifest below still shows the SSH key Secret. It needs reworking for App-token auth before Phase 1 runs — the init container mints or receives a token rather than mounting a key.
+>
+> **Proven so far** (outside K8s, in [`goose-k8s-prep`](./goose-k8s-prep/)): a container can read an issue, push a branch and open a PR as `julieio-goose` using a **PAT** over HTTPS — a spike shortcut, not the target mechanism. Commit signing untested.
 
 ---
 
@@ -183,9 +180,43 @@ stringData:
 
 ## Open questions
 
-- **Does goose commit, or does the shell?** The manifest has the shell commit after `goose run`. goose may commit on its own, which would double up. Confirm behavior and pick one.
+- [x] **Does goose commit, or does the shell?** **The shell.** goose leaves the working tree dirty and does not commit on its own — verified 2026-09-11 in [`goose-k8s-prep`](./goose-k8s-prep/README.md#goose-does-not-commit-on-its-own). No double-fire. Caveat: goose was not *asked* to commit; a prompt that says "commit your work" presumably would, so task prompts must not ask.
 - **PR creation.** Not here yet — `gh` CLI isn't in the image. Phase 1 stops at a pushed branch.
 - **Signing with a mounted key.** `user.signingkey` pointing at a file path works for SSH signing, but is unverified in this setup.
+
+### Exit code 0 does not mean the task succeeded
+
+> [!IMPORTANT]
+> **The manifest's `set -e` + `goose run` is not enough.** `goose run` exits 0 whenever the process did not crash — it signals turn completion, not task success. Three routes to exit-0-with-no-work are observed ([detail](./goose-k8s-prep/README.md#exit-code-0-is-not-a-success-signal)): a skill-injected confirmation prompt, a workspace permission failure, and `--max-turns` exhaustion.
+>
+> **A Job would read all three as success.** This is not a goose defect and no flag fixes it — success criteria belong here, in the orchestration layer.
+>
+> The `args` below need an artifact assertion: fail when the staged diff is empty. All three routes produce that same observable.
+
+```sh
+goose run --recipe /recipes/task.yaml --params ...
+
+git add -A
+if git diff --staged --quiet; then
+  echo "FAIL: goose produced no changes" >&2
+  exit 1
+fi
+git commit -m "..."
+git push origin HEAD
+```
+
+> [!NOTE]
+> This conflates "no changes needed" with "agent failed." Right default for Phase 1 — a Job whose purpose is to push a branch has failed if it pushes nothing.
+
+### Missing: `activeDeadlineSeconds`
+
+The Job has `backoffLimit: 0` and `ttlSecondsAfterFinished`, but **no wall-clock bound**. `--max-turns` caps iterations, not time, and the recipe schema has no timeout field — so a hung run has nothing to stop it. Listed as a fix in [gotchas](./orchestration-k8s-gotchas.md), still absent from the manifest above.
+
+### Switch `--text` to a recipe
+
+The manifest runs `goose run --text "$TASK_PROMPT"`. [`goose-container`](./goose-container/) found recipes the better path for headless runs, and `--recipe` / `--params` both exist in the pinned v1.48.0 — no version bump needed.
+
+Open design question: a recipe carries its own `prompt`, but Phase 2 needs the issue body injected per run. `--params` is the likely mechanism — proven for values like `repo_path`, unproven for a whole task prompt.
 
 ---
 

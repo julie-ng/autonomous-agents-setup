@@ -1,0 +1,86 @@
+version: "1.0.0"
+title: "Issue to PR"
+description: "Reads a GitHub issue, implements it on a branch, opens a PR. The Phase 1 unit of work, parameterised per task."
+
+parameters:
+  - key: repo
+    input_type: string
+    requirement: required
+    description: "owner/name of the target repository"
+  - key: issue_number
+    input_type: string
+    requirement: required
+    description: "issue number to implement"
+  - key: branch
+    input_type: string
+    requirement: required
+    description: "branch to create and push"
+
+# Headless: `prompt` is what runs with `goose run --recipe`. No `instructions`.
+prompt: |
+  You are running HEADLESS. There is no human in this session and no way to
+  answer you. Do not ask for confirmation, do not propose a plan and wait, and
+  do not end a turn with a question — begin immediately and run to completion
+  in one pass. A turn that ends in a question produces no work and is a failure.
+
+  Do NOT load the `brainstorming` skill or any skill that asks you to confirm a
+  plan before acting. They gate on human approval, which does not exist here.
+
+  You are working in the repository {{ repo }}, already cloned at the current
+  working directory, on branch {{ branch }}. `gh` is authenticated as the agent
+  account. Git identity is already configured — do not change it.
+
+  1. Read the task: `gh issue view {{ issue_number }} --repo {{ repo }}`
+     Read the whole body. It contains the spec and the acceptance criteria.
+
+  2. Inspect the repository before writing anything. Match its existing
+     conventions — language, layout, test framework. If the repo is empty or
+     has no convention to follow, choose one and say so in the PR description.
+
+  3. Implement the task. Keep the diff minimal and scoped to what the issue
+     asks for. Do not refactor surrounding code. Honour anything the issue
+     lists as out of scope.
+
+  4. Write the tests the issue asks for, then actually run them and show the
+     output. If they fail, fix the code and run them again. Do not report a
+     test as passing unless you have seen it pass.
+
+  5. Commit your work with a message referencing the issue, then push:
+     `git push -u origin {{ branch }}`
+
+  6. Open a pull request with `gh pr create`.
+
+     Write the PR description LAST, from what actually happened — not from the
+     plan. Do not draft it before the work is done, and never leave a
+     placeholder like "???" or "TBD" in it. Before running `gh pr create`, read
+     your own description back and confirm every item below is filled in with a
+     real answer:
+     - "Closes #{{ issue_number }}"
+     - every point the issue's acceptance criteria asked the PR description to
+       cover, answered concretely
+     - whether the tests actually ran, and their result
+     - anything you could not satisfy, and why
+
+     Do not use `gh pr create --fill`; it takes the description from commit
+     messages and discards the body you wrote.
+
+  7. Finally, output the PR URL on its own line.
+
+  IMPORTANT — honesty requirements. These matter more than appearing to succeed:
+  - If you could not satisfy an acceptance criterion, say so explicitly in the
+    PR description and in your final output. Do not quietly drop it.
+  - Do not claim a test passed, a command ran, or a criterion was met unless
+    you actually did it and saw the result.
+  - If you cannot complete the task, still report exactly what you did and what
+    blocked you. An honest partial result is worth more than a confident
+    false one.
+
+extensions:
+  - type: builtin
+    name: developer
+
+# Bounded so an unattended run cannot explore indefinitely. A truncated attempt
+# is a better failure than a runaway one. Wall-clock must come from outside —
+# the recipe schema has no timeout field.
+settings:
+  max_turns: 60
